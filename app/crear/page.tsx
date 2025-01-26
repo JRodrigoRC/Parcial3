@@ -6,25 +6,38 @@ import { getSession } from 'next-auth/react';
 
 const CrearEvento = () => {
   const [nombre, setNombre] = useState('');
-  const [timestamp, setTimestamp] = useState('');
+  const [timestamp, setTimestamp] = useState(() => {
+    const now = new Date();
+    return now.toISOString().slice(0, 16); // Formato para "datetime-local"
+  });
   const [lugar, setLugar] = useState('');
   const [imagen, setImagen] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
 
+  const validateInputs = () => {
+    if (!nombre || !timestamp || !lugar) {
+      return 'Todos los campos son obligatorios';
+    }
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
 
-    if (!nombre || !timestamp || !lugar) {
-      setError('Todos los campos son obligatorios');
+    // Validación de entradas
+    const validationError = validateInputs();
+    if (validationError) {
+      setError(validationError);
       setIsSubmitting(false);
       return;
     }
 
     try {
+      // Verificar sesión
       const session = await getSession();
       if (!session) {
         setError('Debes iniciar sesión para crear un evento');
@@ -32,6 +45,7 @@ const CrearEvento = () => {
         return;
       }
 
+      // Crear el objeto FormData
       const formData = new FormData();
       formData.append('nombre', nombre);
       formData.append('timestamp', timestamp);
@@ -40,13 +54,14 @@ const CrearEvento = () => {
         formData.append('imagen', imagen);
       }
 
+      // Enviar datos al servidor
       const res = await fetch('/api/eventos', {
         method: 'POST',
         body: formData,
       });
 
       if (res.ok) {
-        router.push('/');
+        router.push('/'); // Redirigir a la página principal
       } else {
         const errorData = await res.json();
         setError(errorData.error || 'Error al crear el evento');
@@ -64,8 +79,11 @@ const CrearEvento = () => {
       {error && <div className="text-red-500 mb-4">{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block font-medium">Nombre:</label>
+          <label htmlFor="nombre" className="block font-medium">
+            Nombre:
+          </label>
           <input
+            id="nombre"
             type="text"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
@@ -74,8 +92,11 @@ const CrearEvento = () => {
           />
         </div>
         <div>
-          <label className="block font-medium">Fecha y hora:</label>
+          <label htmlFor="timestamp" className="block font-medium">
+            Fecha y hora:
+          </label>
           <input
+            id="timestamp"
             type="datetime-local"
             value={timestamp}
             onChange={(e) => setTimestamp(e.target.value)}
@@ -84,8 +105,11 @@ const CrearEvento = () => {
           />
         </div>
         <div>
-          <label className="block font-medium">Lugar:</label>
+          <label htmlFor="lugar" className="block font-medium">
+            Lugar:
+          </label>
           <input
+            id="lugar"
             type="text"
             value={lugar}
             onChange={(e) => setLugar(e.target.value)}
@@ -94,8 +118,11 @@ const CrearEvento = () => {
           />
         </div>
         <div>
-          <label className="block font-medium">Imagen:</label>
+          <label htmlFor="imagen" className="block font-medium">
+            Imagen:
+          </label>
           <input
+            id="imagen"
             type="file"
             onChange={(e) => setImagen(e.target.files?.[0] || null)}
             className="w-full"
