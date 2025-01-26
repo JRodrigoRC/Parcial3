@@ -31,7 +31,7 @@ export default function Home() {
       fetch(`/api/coordenadas?creador=${session.user.email}`)
         .then((response) => response.json())
         .then((data) => setCoordenadas(Array.isArray(data) ? data : []))
-        .catch((error) => setError('Error al cargar las coordenadas'));
+        .catch(() => setError('Error al cargar las coordenadas'));
     }
   }, [status, session?.user?.email]);
 
@@ -62,7 +62,7 @@ export default function Home() {
         const errorData = await response.json();
         setError(errorData.error || 'Error al agregar la coordenada');
       }
-    } catch (error) {
+    } catch {
       setError('Error al agregar la coordenada');
     } finally {
       setIsSubmitting(false);
@@ -86,11 +86,11 @@ export default function Home() {
             Sign Out
           </button>
         </div>
-      )
+      );
     } else if (status === "loading") {
       return (
         <span className="text-[#888] text-sm mt-7">Loading...</span>
-      )
+      );
     } else {
       return (
         <Link
@@ -99,9 +99,9 @@ export default function Home() {
         >
           Sign In
         </Link>
-      )
+      );
     }
-  }
+  };
 
   return (
     <main className="flex min-h-screen flex-col items-center p-8">
