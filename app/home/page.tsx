@@ -123,7 +123,6 @@ export default function Home() {
             accept="image/*"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
             className="border border-solid border-black rounded px-4 py-2"
-            required
           />
           <button
             type="submit"
@@ -143,11 +142,13 @@ export default function Home() {
         {coordenadas.map((coordenada) => (
           <Link href={`/eventos/${coordenada._id}`} key={coordenada._id}>
             <div className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-              <img 
-                src={coordenada.imagen} 
-                alt={coordenada.nombre}
-                className="w-full h-48 object-cover"
-              />
+              {coordenada.imagen && (
+                <img 
+                  src={coordenada.imagen} 
+                  alt={coordenada.nombre}
+                  className="w-full h-48 object-cover"
+                />
+              )}
               <div className="p-4">
                 <h2 className="font-bold text-xl mb-2">{coordenada.nombre}</h2>
                 <p className="text-gray-600">
