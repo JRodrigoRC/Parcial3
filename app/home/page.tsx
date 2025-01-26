@@ -24,7 +24,6 @@ export default function Home() {
   const [coordenadas, setCoordenadas] = useState<Coordenada[]>([]);
   const [error, setError] = useState('');
   const [nombre, setNombre] = useState('');
-  const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -44,23 +43,21 @@ export default function Home() {
         throw new Error('No se ha encontrado el email del usuario');
       }
 
-      const formData = new FormData();
-      formData.append("nombre", nombre);
-      formData.append("creador", session.user.email);
-      if (file) {
-        formData.append("imagen", file);
-      }
-
       const response = await fetch('/api/coordenadas', {
         method: 'POST',
-        body: formData,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nombre,
+          creador: session.user.email,
+        }),
       });
 
       if (response.ok) {
         const newCoordenada = await response.json();
         setCoordenadas((prev) => [...prev, newCoordenada]);
         setNombre('');
-        setFile(null);
       } else {
         const errorData = await response.json();
         setError(errorData.error || 'Error al agregar la coordenada');
@@ -89,9 +86,11 @@ export default function Home() {
             Sign Out
           </button>
         </div>
-      );
+      )
     } else if (status === "loading") {
-      return <span className="text-[#888] text-sm mt-7">Loading...</span>;
+      return (
+        <span className="text-[#888] text-sm mt-7">Loading...</span>
+      )
     } else {
       return (
         <Link
@@ -100,9 +99,9 @@ export default function Home() {
         >
           Sign In
         </Link>
-      );
+      )
     }
-  };
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center p-8">
@@ -117,12 +116,6 @@ export default function Home() {
             placeholder="Introduce un país o ciudad"
             className="border border-solid border-black rounded px-4 py-2"
             required
-          />
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-            className="border border-solid border-black rounded px-4 py-2"
           />
           <button
             type="submit"
@@ -142,13 +135,11 @@ export default function Home() {
         {coordenadas.map((coordenada) => (
           <Link href={`/eventos/${coordenada._id}`} key={coordenada._id}>
             <div className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-              {coordenada.imagen && (
-                <img 
-                  src={coordenada.imagen} 
-                  alt={coordenada.nombre}
-                  className="w-full h-48 object-cover"
-                />
-              )}
+              <img 
+                src={coordenada.imagen} 
+                alt={coordenada.nombre}
+                className="w-full h-48 object-cover"
+              />
               <div className="p-4">
                 <h2 className="font-bold text-xl mb-2">{coordenada.nombre}</h2>
                 <p className="text-gray-600">
