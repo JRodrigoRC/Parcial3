@@ -24,6 +24,7 @@ export default function Home() {
   const [coordenadas, setCoordenadas] = useState<Coordenada[]>([]);
   const [error, setError] = useState('');
   const [nombre, setNombre] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -31,7 +32,7 @@ export default function Home() {
       fetch(`/api/coordenadas?creador=${session.user.email}`)
         .then((response) => response.json())
         .then((data) => setCoordenadas(Array.isArray(data) ? data : []))
-        .catch(() => setError('Error al cargar las coordenadas'));
+        .catch((error) => setError('Error al cargar las coordenadas'));
     }
   }, [status, session?.user?.email]);
 
@@ -43,26 +44,28 @@ export default function Home() {
         throw new Error('No se ha encontrado el email del usuario');
       }
 
+      const formData = new FormData();
+      formData.append("nombre", nombre);
+      formData.append("creador", session.user.email);
+      if (file) {
+        formData.append("imagen", file);
+      }
+
       const response = await fetch('/api/coordenadas', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nombre,
-          creador: session.user.email,
-        }),
+        body: formData,
       });
 
       if (response.ok) {
         const newCoordenada = await response.json();
         setCoordenadas((prev) => [...prev, newCoordenada]);
         setNombre('');
+        setFile(null);
       } else {
         const errorData = await response.json();
         setError(errorData.error || 'Error al agregar la coordenada');
       }
-    } catch {
+    } catch (error) {
       setError('Error al agregar la coordenada');
     } finally {
       setIsSubmitting(false);
@@ -88,9 +91,7 @@ export default function Home() {
         </div>
       );
     } else if (status === "loading") {
-      return (
-        <span className="text-[#888] text-sm mt-7">Loading...</span>
-      );
+      return <span className="text-[#888] text-sm mt-7">Loading...</span>;
     } else {
       return (
         <Link
@@ -114,6 +115,13 @@ export default function Home() {
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             placeholder="Introduce un país o ciudad"
+            className="border border-solid border-black rounded px-4 py-2"
+            required
+          />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
             className="border border-solid border-black rounded px-4 py-2"
             required
           />
