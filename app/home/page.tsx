@@ -1,157 +1,98 @@
 "use client";
-import { useState, useEffect } from "react";
-import { signOut, useSession } from "next-auth/react";
-import Link from "next/link";
+
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
+import { getSession } from "next-auth/react";
 
-const Map = dynamic(() => import('@/components/Map'), { ssr: false });
-
-interface Coordenada {
-  _id: string;
-  nombre: string;
-  lat: number;
-  lon: number;
-  creador: string;
-  imagen: string;
-  timestamp: string;
-  lugar: string;
-}
-
-export default function Home() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [coordenadas, setCoordenadas] = useState<Coordenada[]>([]);
-  const [error, setError] = useState('');
-  const [nombre, setNombre] = useState('');
+const CrearEvento = () => {
+  const [formData, setFormData] = useState({
+    nombre: '',
+    timestamp: '',
+    lugar: '',
+    imagen: null as File | null,
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const router = useRouter();
 
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user?.email) {
-      fetch(`/api/coordenadas?creador=${session.user.email}`)
-        .then((response) => response.json())
-        .then((data) => setCoordenadas(Array.isArray(data) ? data : []))
-        .catch((error) => setError('Error al cargar las coordenadas'));
-    }
-  }, [status, session?.user?.email]);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, files } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: files ? files[0] : value,
+    }));
+  };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+
     try {
-      if (!session?.user?.email) {
-        throw new Error('No se ha encontrado el email del usuario');
+      const session = await getSession();
+      if (!session || !session.user?.email) {
+        throw new Error('No hay sesión activa o email del usuario no encontrado');
       }
 
-      const response = await fetch('/api/coordenadas', {
+      const body = new FormData();
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value) body.append(key, value as any);
+      });
+      body.append('organizador', session.user.email);
+
+      const res = await fetch('/api/eventos', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nombre,
-          creador: session.user.email,
-        }),
+        body,
       });
 
-      if (response.ok) {
-        const newCoordenada = await response.json();
-        setCoordenadas((prev) => [...prev, newCoordenada]);
-        setNombre('');
+      if (res.ok) {
+        router.push('/');
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Error al agregar la coordenada');
+        throw new Error('Error al crear el evento');
       }
     } catch (error) {
-      setError('Error al agregar la coordenada');
+      console.error(error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const showSession = () => {
-    if (status === "authenticated") {
-      return (
-        <div className="flex flex-col items-center gap-4 mb-8">
-          <h2>Bienvenido {session?.user?.name}</h2>
-          <img src={session?.user?.image ?? undefined} alt={session?.user?.name ?? ""} className="w-20 h-20 rounded-full" />
-          <button
-            className="border border-solid border-black rounded px-4 py-2"
-            onClick={() => {
-              signOut({ redirect: false }).then(() => {
-                router.push("/");
-              });
-            }}
-          >
-            Sign Out
-          </button>
-        </div>
-      )
-    } else if (status === "loading") {
-      return (
-        <span className="text-[#888] text-sm mt-7">Loading...</span>
-      )
-    } else {
-      return (
-        <Link
-          href="/login"
-          className="border border-solid border-black rounded px-4 py-2 mb-8"
-        >
-          Sign In
-        </Link>
-      )
-    }
-  }
-
   return (
-    <main className="flex min-h-screen flex-col items-center p-8">
-      {showSession()}
-
-      <div className="w-full max-w-xl mb-8">
-        <form onSubmit={handleSubmit} className="flex flex-col items-center gap-4 mt-8">
+    <form onSubmit={handleSubmit} className="max-w-lg mx-auto">
+      {['nombre', 'timestamp', 'lugar'].map((field) => (
+        <div key={field} className="mb-4">
+          <label className="block text-sm font-medium text-gray-700">
+            {field.charAt(0).toUpperCase() + field.slice(1)}
+          </label>
           <input
-            type="text"
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            placeholder="Introduce un país o ciudad"
-            className="border border-solid border-black rounded px-4 py-2"
+            type={field === 'timestamp' ? 'datetime-local' : 'text'}
+            name={field}
+            value={(formData as any)[field]}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded"
             required
           />
-          <button
-            type="submit"
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Añadiendo...' : 'Añadir marcador'}
-          </button>
-        </form>
+        </div>
+      ))}
+
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700">Imagen</label>
+        <input
+          type="file"
+          name="imagen"
+          onChange={handleChange}
+          className="w-full"
+          required
+        />
       </div>
 
-      <div className="w-full h-64 mb-8">
-        <Map location={{ lat: coordenadas[0]?.lat || 0, lon: coordenadas[0]?.lon || 0 }} coordenadas={coordenadas} />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-7xl">
-        {coordenadas.map((coordenada) => (
-          <Link href={`/eventos/${coordenada._id}`} key={coordenada._id}>
-            <div className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
-              <img 
-                src={coordenada.imagen} 
-                alt={coordenada.nombre}
-                className="w-full h-48 object-cover"
-              />
-              <div className="p-4">
-                <h2 className="font-bold text-xl mb-2">{coordenada.nombre}</h2>
-                <p className="text-gray-600">
-                  {new Date(coordenada.timestamp).toLocaleDateString()}
-                </p>
-                <p className="text-gray-600">{coordenada.lugar}</p>
-                <p className="text-gray-600">Organizador: {coordenada.creador}</p>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
-    </main>
+      <button
+        type="submit"
+        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? 'Creando...' : 'Crear Evento'}
+      </button>
+    </form>
   );
-}
+};
+
+export default CrearEvento;

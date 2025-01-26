@@ -5,6 +5,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import cloudinary from "@/lib/cloudinary";
 
+// Validador simple para los datos de entrada
+const validateInputs = (data: { nombre?: string; timestamp?: string; lugar?: string }) => {
+  const errors = [];
+  if (!data.nombre) errors.push("El nombre es obligatorio.");
+  if (!data.timestamp) errors.push("El timestamp es obligatorio.");
+  if (!data.lugar) errors.push("El lugar es obligatorio.");
+  return errors;
+};
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -54,37 +63,60 @@ export async function PUT(
     const lugar = formData.get("lugar") as string;
     const imagen = formData.get("imagen") as File;
 
+    // Validar entradas
+    const validationErrors = validateInputs({ nombre, timestamp, lugar });
+    if (validationErrors.length > 0) {
+      return NextResponse.json({ error: validationErrors.join(", ") }, { status: 400 });
+    }
+
     // Procesar nueva imagen si se proporciona
     let imagenUrl = coordenada.imagen;
     if (imagen) {
-      const bytes = await imagen.arrayBuffer();
-      const buffer = Buffer.from(bytes);
+      try {
+        const bytes = await imagen.arrayBuffer();
+        const buffer = Buffer.from(bytes);
 
-      const response = await new Promise((resolve, reject) => {
-        cloudinary.uploader
-          .upload_stream({ resource_type: "image" }, (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          })
-          .end(buffer);
-      });
-      imagenUrl = (response as { secure_url: string }).secure_url;
+        const response = await new Promise((resolve, reject) => {
+          cloudinary.uploader
+            .upload_stream({ resource_type: "image", folder: "coordenadas" }, (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            })
+            .end(buffer);
+        });
+        imagenUrl = (response as { secure_url: string }).secure_url;
+      } catch (error) {
+        console.error("Error al subir la imagen:", error);
+        return NextResponse.json(
+          { error: "No se pudo subir la imagen. Intenta nuevamente." },
+          { status: 500 }
+        );
+      }
     }
 
-    // Obtener coordenadas del lugar
-    const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-      lugar
-    )}&format=json&limit=1`;
-
-    const geocodeResponse = await fetch(geocodeUrl);
-    const geocodeData = await geocodeResponse.json();
-
+    // Obtener coordenadas del lugar si cambió
     let lat = coordenada.lat;
     let lon = coordenada.lon;
+    if (lugar && lugar !== coordenada.lugar) {
+      try {
+        const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+          lugar
+        )}&format=json&limit=1`;
 
-    if (geocodeData && geocodeData.length > 0) {
-      lat = parseFloat(geocodeData[0].lat);
-      lon = parseFloat(geocodeData[0].lon);
+        const geocodeResponse = await fetch(geocodeUrl);
+        const geocodeData = await geocodeResponse.json();
+
+        if (geocodeData && geocodeData.length > 0) {
+          lat = parseFloat(geocodeData[0].lat);
+          lon = parseFloat(geocodeData[0].lon);
+        }
+      } catch (error) {
+        console.error("Error al obtener las coordenadas del lugar:", error);
+        return NextResponse.json(
+          { error: "No se pudo obtener la ubicación del lugar. Intenta nuevamente." },
+          { status: 500 }
+        );
+      }
     }
 
     const coordenadaActualizada = await Coordenada.findByIdAndUpdate(
@@ -95,7 +127,7 @@ export async function PUT(
         lugar,
         lat,
         lon,
-        imagen: imagenUrl
+        imagen: imagenUrl,
       },
       { new: true }
     );
