@@ -17,10 +17,6 @@ const nextConfig: NextConfig = {
     CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
   },
 
-  // Habilitar SWC para minificación más rápida
-  swcMinify: true,
-
-  // Modo experimental (actívalo si estás usando la carpeta "app")
 };
 
 export default nextConfig;
