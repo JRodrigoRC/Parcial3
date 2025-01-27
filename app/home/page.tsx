@@ -126,7 +126,7 @@ export default function Home() {
         <input
             type="text"
             value={titulo}
-            onChange={(e) => setNombre(e.target.value)}
+            onChange={(e) => setTitulo(e.target.value)}
             placeholder="Introduce titulo de la pelicula"
             className="border border-solid border-black rounded px-4 py-2"
             required
