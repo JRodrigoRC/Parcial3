@@ -25,6 +25,7 @@ const PeliculaSchema = new mongoose.Schema(
   }
 );
 
-const Pelicula = mongoose.models?.Pelicula || mongoose.model("Pelicula", PeliculaSchema);
+const Pelicula =
+ mongoose.models?.Pelicula || mongoose.model("Pelicula", PeliculaSchema);
 
 export default Pelicula;
