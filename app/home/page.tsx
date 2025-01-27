@@ -113,11 +113,19 @@ export default function Home() {
 
       <div className="w-full max-w-xl mb-8">
         <form onSubmit={handleSubmit} className="flex flex-col items-center gap-4 mt-8">
-          <input
+        <input
             type="text"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            placeholder="Introduce un país o ciudad"
+            placeholder="Introduce localizacion de la sala"
+            className="border border-solid border-black rounded px-4 py-2"
+            required
+          />
+        <input
+            type="text"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Introduce nombre de la pelicula"
             className="border border-solid border-black rounded px-4 py-2"
             required
           />
@@ -157,7 +165,7 @@ export default function Home() {
                   {new Date(coordenada.timestamp).toLocaleDateString()}
                 </p>
                 <p className="text-gray-600">{coordenada.lugar}</p>
-                <p className="text-gray-600">Organizador: {coordenada.creador}</p>
+                <p className="text-gray-600">Dueño de la sala: {coordenada.creador}</p>
               </div>
             </div>
           </Link>
