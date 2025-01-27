@@ -26,7 +26,7 @@ export default function CrearSala() {
     formData.append("direccion", direccion);
 
     try {
-      const response = await fetch("/api/salas", {
+      const response = await fetch("/api/coordenadas", {
         method: "PUT",
         body: formData,
       });

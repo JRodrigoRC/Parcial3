@@ -28,7 +28,7 @@ export default function CrearPelicula() {
     }
 
     try {
-      const response = await fetch("/api/peliculas", {
+      const response = await fetch("/api/coordenadas", {
         method: "POST",
         body: formData,
       });

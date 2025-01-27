@@ -4,7 +4,6 @@ import { connectDB } from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { v2 as cloudinary } from "cloudinary";
-import Coordenada from "@/models/Coordenada";
 import Pelicula from "@/models/Pelicula";
 import Sala from "@/models/Sala";
 
