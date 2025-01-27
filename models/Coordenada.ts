@@ -2,6 +2,10 @@ import mongoose from "mongoose";
 
 const CoordenadaSchema = new mongoose.Schema(
   {
+    titulo: {
+      type: String,
+      required: true,
+    },
     nombre: {
       type: String,
       required: true,

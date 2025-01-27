@@ -56,9 +56,16 @@ export async function POST(req: Request) {
 
     // 3. Obtener datos del formulario
     const formData = await req.formData();
+    const titulo = formData.get("titulo") as string;
     const nombre = formData.get("nombre") as string;
     const file = formData.get("imagen") as Blob | null;
 
+    if (!titulo) {
+      return NextResponse.json(
+        { error: "El titulo de la pelicula es obligatorio" },
+        { status: 400 }
+      );
+    }
     if (!nombre) {
       return NextResponse.json(
         { error: "El nombre de la ubicación es obligatorio" },
@@ -124,6 +131,7 @@ export async function POST(req: Request) {
 
     // 6. Crear nueva coordenada en la base de datos
     const coordenada = new Coordenada({
+      titulo,
       nombre,
       lat: parseFloat(lat),
       lon: parseFloat(lon),

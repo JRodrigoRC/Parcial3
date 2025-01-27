@@ -9,6 +9,7 @@ const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 
 interface Coordenada {
   _id: string;
+  titulo: string;
   nombre: string;
   lat: number;
   lon: number;
@@ -23,6 +24,7 @@ export default function Home() {
   const router = useRouter();
   const [coordenadas, setCoordenadas] = useState<Coordenada[]>([]);
   const [error, setError] = useState('');
+  const [titulo, setTitulo] = useState('');
   const [nombre, setNombre] = useState('');
   const [imagen, setImagen] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -123,9 +125,9 @@ export default function Home() {
           />
         <input
             type="text"
-            value={nombre}
+            value={titulo}
             onChange={(e) => setNombre(e.target.value)}
-            placeholder="Introduce nombre de la pelicula"
+            placeholder="Introduce titulo de la pelicula"
             className="border border-solid border-black rounded px-4 py-2"
             required
           />
@@ -156,7 +158,7 @@ export default function Home() {
             <div className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
               <img 
                 src={coordenada.imagen || '/placeholder.png'} 
-                alt={coordenada.nombre}
+                alt={coordenada.titulo}
                 className="w-full h-48 object-cover"
               />
               <div className="p-4">
