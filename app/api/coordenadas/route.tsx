@@ -1,11 +1,9 @@
-// Importaciones comunes
 import { NextRequest, NextResponse } from "next/server";
+import Coordenada from "@/models/Coordenada";
 import { connectDB } from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { v2 as cloudinary } from "cloudinary";
-import Pelicula from "@/models/Pelicula";
-import Sala from "@/models/Sala";
 
 // Configuración de Cloudinary
 cloudinary.config({
@@ -14,38 +12,95 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Crear película
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const lat = searchParams.get("lat");
+    const lon = searchParams.get("lon");
+
+    await connectDB();
+
+    if (lat && lon) {
+      const coordenadas = await Coordenada.find({
+        lat: { $gte: Number(lat) - 0.2, $lte: Number(lat) + 0.2 },
+        lon: { $gte: Number(lon) - 0.2, $lte: Number(lon) + 0.2 },
+      }).sort({ timestamp: 1 });
+      
+      return NextResponse.json(coordenadas);
+    }
+
+    const coordenadas = await Coordenada.find({}).sort({ timestamp: 1 });
+    return NextResponse.json(coordenadas);
+  } catch (error) {
+    console.error("Error al obtener coordenadas:", error);
+    return NextResponse.json(
+      { error: "Error al obtener coordenadas" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    // 1. Verificar sesión del usuario
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json(
-        { error: "Debes iniciar sesión para crear una película" },
+        { error: "Debes iniciar sesión para crear coordenadas" },
         { status: 401 }
       );
     }
 
+    // 2. Conectar a la base de datos
     await connectDB();
 
-    const formData = await request.formData();
-    const titulo = formData.get("titulo") as string;
-    const cartel = formData.get("cartel") as Blob | null;
+    // 3. Obtener datos del formulario
+    const formData = await req.formData();
+    const nombre = formData.get("nombre") as string;
+    const file = formData.get("imagen") as Blob | null;
 
-    if (!titulo) {
+    if (!nombre) {
       return NextResponse.json(
-        { error: "El título de la película es obligatorio" },
+        { error: "El nombre de la ubicación es obligatorio" },
         { status: 400 }
       );
     }
 
-    // Subir cartel a Cloudinary
-    let cartelUrl = "";
-    if (cartel) {
+    // 4. Obtener coordenadas de geocodificación
+    const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+      nombre
+    )}&format=json&limit=1`;
+
+    const geocodeResponse = await fetch(geocodeUrl);
+
+    if (!geocodeResponse.ok) {
+      console.error("Error al contactar el servicio de geocodificación.");
+      return NextResponse.json(
+        { error: "Error al obtener coordenadas de geocodificación" },
+        { status: 500 }
+      );
+    }
+
+    const geocodeData = await geocodeResponse.json();
+
+    if (!geocodeData || geocodeData.length === 0) {
+      return NextResponse.json(
+        { error: "No se encontraron coordenadas para la ubicación proporcionada" },
+        { status: 400 }
+      );
+    }
+
+    const { lat, lon } = geocodeData[0];
+
+    // 5. Subir imagen a Cloudinary (si existe)
+    let imageUrl = "";
+    if (file) {
       try {
-        const buffer = Buffer.from(await cartel.arrayBuffer());
+        const buffer = Buffer.from(await file.arrayBuffer());
+
         const uploadResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
-            { folder: "peliculas", resource_type: "image" },
+            { folder: "coordenadas", resource_type: "image" },
             (error, result) => {
               if (error) {
                 reject(error);
@@ -57,73 +112,34 @@ export async function POST(request: NextRequest) {
           stream.end(buffer);
         });
 
-        cartelUrl = uploadResult.secure_url;
+        imageUrl = uploadResult.secure_url;
       } catch (cloudinaryError) {
-        console.error("Error al subir el cartel a Cloudinary:", cloudinaryError);
+        console.error("Error al subir la imagen a Cloudinary:", cloudinaryError);
         return NextResponse.json(
-          { error: "Error al subir el cartel" },
+          { error: "Error al subir la imagen" },
           { status: 500 }
         );
       }
     }
 
-    const pelicula = new Pelicula({
-      titulo,
-      cartel: cartelUrl,
-      propietario: session.user.email,
-      timestamp: new Date(),
-    });
-
-    await pelicula.save();
-
-    return NextResponse.json(pelicula, { status: 201 });
-  } catch (error) {
-    console.error("Error al crear la película:", error);
-    return NextResponse.json(
-      { error: "Ocurrió un error al crear la película" },
-      { status: 500 }
-    );
-  }
-}
-
-// Crear sala
-export async function PUT(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Debes iniciar sesión para crear una sala" },
-        { status: 401 }
-      );
-    }
-
-    await connectDB();
-
-    const formData = await request.formData();
-    const nombre = formData.get("nombre") as string;
-    const direccion = formData.get("direccion") as string;
-
-    if (!nombre || !direccion) {
-      return NextResponse.json(
-        { error: "El nombre y la dirección de la sala son obligatorios" },
-        { status: 400 }
-      );
-    }
-
-    const sala = new Sala({
+    // 6. Crear nueva coordenada en la base de datos
+    const coordenada = new Coordenada({
       nombre,
-      direccion,
-      propietario: session.user.email,
+      lat: parseFloat(lat),
+      lon: parseFloat(lon),
+      creador: session.user.email,
       timestamp: new Date(),
+      lugar: nombre,
+      imagen: imageUrl,
     });
 
-    await sala.save();
+    await coordenada.save();
 
-    return NextResponse.json(sala, { status: 201 });
+    return NextResponse.json(coordenada, { status: 201 });
   } catch (error) {
-    console.error("Error al crear la sala:", error);
+    console.error("Error general al procesar la solicitud:", error);
     return NextResponse.json(
-      { error: "Ocurrió un error al crear la sala" },
+      { error: "Ocurrió un error inesperado al procesar la solicitud" },
       { status: 500 }
     );
   }
