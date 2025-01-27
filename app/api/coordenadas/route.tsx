@@ -5,7 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import cloudinary from "cloudinary";
 
-// Configura Cloudinary
+// Configuración de Cloudinary
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -14,7 +14,7 @@ cloudinary.v2.config({
 
 export async function POST(req: Request) {
   try {
-    // Verificar sesión del usuario
+    // 1. Verificar sesión del usuario
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json(
@@ -23,28 +23,30 @@ export async function POST(req: Request) {
       );
     }
 
-    // Conectar a la base de datos
+    // 2. Conectar a la base de datos
     await connectDB();
 
-    // Procesar datos del formulario
+    // 3. Obtener datos del formulario
     const formData = await req.formData();
     const nombre = formData.get("nombre") as string;
     const file = formData.get("imagen") as Blob | null;
 
     if (!nombre) {
       return NextResponse.json(
-        { error: "El nombre es obligatorio" },
+        { error: "El nombre de la ubicación es obligatorio" },
         { status: 400 }
       );
     }
 
-    // Obtener coordenadas de geocodificación
+    // 4. Obtener coordenadas de geocodificación
     const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
       nombre
     )}&format=json&limit=1`;
+
     const geocodeResponse = await fetch(geocodeUrl);
 
     if (!geocodeResponse.ok) {
+      console.error("Error al contactar el servicio de geocodificación.");
       return NextResponse.json(
         { error: "Error al obtener coordenadas de geocodificación" },
         { status: 500 }
@@ -62,7 +64,7 @@ export async function POST(req: Request) {
 
     const { lat, lon } = geocodeData[0];
 
-    // Subir imagen a Cloudinary
+    // 5. Subir imagen a Cloudinary (si existe)
     let imageUrl = "";
     if (file) {
       try {
@@ -87,7 +89,7 @@ export async function POST(req: Request) {
         const uploadResult = await uploadImage();
         imageUrl = uploadResult.secure_url;
       } catch (cloudinaryError) {
-        console.error("Error al subir la imagen:", cloudinaryError);
+        console.error("Error al subir la imagen a Cloudinary:", cloudinaryError);
         return NextResponse.json(
           { error: "Error al subir la imagen" },
           { status: 500 }
@@ -95,7 +97,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Crear nueva coordenada en la base de datos
+    // 6. Crear nueva coordenada en la base de datos
     const coordenada = new Coordenada({
       nombre,
       lat: parseFloat(lat),
@@ -112,7 +114,7 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("Error general al procesar la solicitud:", error);
     return NextResponse.json(
-      { error: "Error al procesar la solicitud" },
+      { error: "Ocurrió un error inesperado al procesar la solicitud" },
       { status: 500 }
     );
   }
