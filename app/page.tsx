@@ -22,7 +22,7 @@ export default function Page() {
 
   return (
     <div className="flex flex-col items-center gap-4 mb-8">
-      <h1>Bienvenido a MiMapa</h1>
+      <h1>Bienvenido a Tu Cine</h1>
       <h2>Inicia sesión para continuar</h2>
       <button
         className="border border-solid border-black rounded px-4 py-2"
