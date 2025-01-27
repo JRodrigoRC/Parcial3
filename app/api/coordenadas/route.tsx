@@ -60,12 +60,7 @@ export async function POST(req: Request) {
     const nombre = formData.get("nombre") as string;
     const file = formData.get("imagen") as Blob | null;
 
-    if (!titulo) {
-      return NextResponse.json(
-        { error: "El titulo de la pelicula es obligatorio" },
-        { status: 400 }
-      );
-    }
+
     if (!nombre) {
       return NextResponse.json(
         { error: "El nombre de la ubicación es obligatorio" },
