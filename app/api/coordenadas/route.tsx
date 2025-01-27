@@ -12,6 +12,34 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const lat = searchParams.get("lat");
+    const lon = searchParams.get("lon");
+
+    await connectDB();
+
+    if (lat && lon) {
+      const coordenadas = await Coordenada.find({
+        lat: { $gte: Number(lat) - 0.2, $lte: Number(lat) + 0.2 },
+        lon: { $gte: Number(lon) - 0.2, $lte: Number(lon) + 0.2 },
+      }).sort({ timestamp: 1 });
+      
+      return NextResponse.json(coordenadas);
+    }
+
+    const coordenadas = await Coordenada.find({}).sort({ timestamp: 1 });
+    return NextResponse.json(coordenadas);
+  } catch (error) {
+    console.error("Error al obtener coordenadas:", error);
+    return NextResponse.json(
+      { error: "Error al obtener coordenadas" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req: Request) {
   try {
     // 1. Verificar sesión del usuario
