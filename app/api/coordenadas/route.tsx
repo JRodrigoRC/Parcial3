@@ -3,10 +3,10 @@ import Coordenada from "@/models/Coordenada";
 import { connectDB } from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import cloudinary from "cloudinary";
+import { v2 as cloudinary } from "cloudinary";
 
 // Configuración de Cloudinary
-cloudinary.v2.config({
+cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
@@ -70,23 +70,20 @@ export async function POST(req: Request) {
       try {
         const buffer = Buffer.from(await file.arrayBuffer());
 
-        const uploadImage = (): Promise<{ secure_url: string }> => {
-          return new Promise((resolve, reject) => {
-            const stream = cloudinary.v2.uploader.upload_stream(
-              { folder: "coordenadas", resource_type: "image" },
-              (error, result) => {
-                if (error) {
-                  reject(error);
-                } else {
-                  resolve(result as { secure_url: string });
-                }
+        const uploadResult = await new Promise<{ secure_url: string }>((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: "coordenadas", resource_type: "image" },
+            (error, result) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve(result as { secure_url: string });
               }
-            );
-            stream.end(buffer);
-          });
-        };
+            }
+          );
+          stream.end(buffer);
+        });
 
-        const uploadResult = await uploadImage();
         imageUrl = uploadResult.secure_url;
       } catch (cloudinaryError) {
         console.error("Error al subir la imagen a Cloudinary:", cloudinaryError);
