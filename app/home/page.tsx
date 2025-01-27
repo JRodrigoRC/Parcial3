@@ -24,6 +24,7 @@ export default function Home() {
   const [coordenadas, setCoordenadas] = useState<Coordenada[]>([]);
   const [error, setError] = useState('');
   const [nombre, setNombre] = useState('');
+  const [imagen, setImagen] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -38,26 +39,29 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError('');
+
     try {
       if (!session?.user?.email) {
         throw new Error('No se ha encontrado el email del usuario');
       }
 
+      const formData = new FormData();
+      formData.append('nombre', nombre);
+      if (imagen) {
+        formData.append('imagen', imagen);
+      }
+
       const response = await fetch('/api/coordenadas', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          nombre,
-          creador: session.user.email,
-        }),
+        body: formData,
       });
 
       if (response.ok) {
         const newCoordenada = await response.json();
         setCoordenadas((prev) => [...prev, newCoordenada]);
         setNombre('');
+        setImagen(null);
       } else {
         const errorData = await response.json();
         setError(errorData.error || 'Error al agregar la coordenada');
@@ -117,6 +121,12 @@ export default function Home() {
             className="border border-solid border-black rounded px-4 py-2"
             required
           />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setImagen(e.target.files?.[0] || null)}
+            className="border border-solid border-black rounded px-4 py-2"
+          />
           <button
             type="submit"
             className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
@@ -125,6 +135,7 @@ export default function Home() {
             {isSubmitting ? 'Añadiendo...' : 'Añadir marcador'}
           </button>
         </form>
+        {error && <div className="text-red-500 mt-4">{error}</div>}
       </div>
 
       <div className="w-full h-64 mb-8">
@@ -136,7 +147,7 @@ export default function Home() {
           <Link href={`/eventos/${coordenada._id}`} key={coordenada._id}>
             <div className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
               <img 
-                src={coordenada.imagen} 
+                src={coordenada.imagen || '/placeholder.png'} 
                 alt={coordenada.nombre}
                 className="w-full h-48 object-cover"
               />

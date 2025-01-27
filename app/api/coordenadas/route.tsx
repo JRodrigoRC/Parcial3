@@ -3,34 +3,14 @@ import Coordenada from "@/models/Coordenada";
 import { connectDB } from "@/lib/mongodb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import cloudinary from "cloudinary";
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const lat = searchParams.get("lat");
-    const lon = searchParams.get("lon");
-
-    await connectDB();
-
-    if (lat && lon) {
-      const coordenadas = await Coordenada.find({
-        lat: { $gte: Number(lat) - 0.2, $lte: Number(lat) + 0.2 },
-        lon: { $gte: Number(lon) - 0.2, $lte: Number(lon) + 0.2 },
-      }).sort({ timestamp: 1 });
-      
-      return NextResponse.json(coordenadas);
-    }
-
-    const coordenadas = await Coordenada.find({}).sort({ timestamp: 1 });
-    return NextResponse.json(coordenadas);
-  } catch (error) {
-    console.error("Error al obtener coordenadas:", error);
-    return NextResponse.json(
-      { error: "Error al obtener coordenadas" },
-      { status: 500 }
-    );
-  }
-}
+// Configura Cloudinary
+cloudinary.v2.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(req: Request) {
   try {
@@ -43,32 +23,72 @@ export async function POST(req: Request) {
     }
 
     await connectDB();
-    const { nombre } = await req.json();
+    const formData = await req.formData();
+    const nombre = formData.get("nombre") as string;
+    const file = formData.get("imagen") as Blob | null;
 
-    const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(nombre)}&format=json&limit=1`;
+    if (!nombre) {
+      return NextResponse.json(
+        { error: "El nombre es obligatorio" },
+        { status: 400 }
+      );
+    }
+
+    // Geocodificación de la ubicación
+    const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+      nombre
+    )}&format=json&limit=1`;
     const geocodeResponse = await fetch(geocodeUrl);
     const geocodeData = await geocodeResponse.json();
 
-    if (geocodeData && geocodeData.length > 0) {
-      const { lat, lon } = geocodeData[0];
-      const coordenada = new Coordenada({
-        nombre,
-        lat: parseFloat(lat),
-        lon: parseFloat(lon),
-        creador: session.user.email,
-        timestamp: new Date(),
-        lugar: nombre,
-        imagen: "", // Puedes agregar lógica para manejar imágenes si es necesario
-      });
-
-      await coordenada.save();
-      return NextResponse.json(coordenada, { status: 201 });
-    } else {
+    if (!geocodeData || geocodeData.length === 0) {
       return NextResponse.json(
         { error: "No se encontraron coordenadas para la ubicación proporcionada" },
         { status: 400 }
       );
     }
+
+    const { lat, lon } = geocodeData[0];
+
+    // Subida de la imagen a Cloudinary (si existe)
+    let imageUrl = "";
+    if (file) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+
+      // Promesa para manejar la subida del flujo
+      const uploadImage = (): Promise<{ secure_url: string }> => {
+        return new Promise((resolve, reject) => {
+          const stream = cloudinary.v2.uploader.upload_stream(
+            { folder: "coordenadas", resource_type: "image" },
+            (error, result) => {
+              if (error) {
+                reject(error);
+              } else {
+                resolve(result as { secure_url: string });
+              }
+            }
+          );
+          stream.end(buffer);
+        });
+      };
+
+      const uploadResult = await uploadImage();
+      imageUrl = uploadResult.secure_url;
+    }
+
+    // Crear la nueva coordenada
+    const coordenada = new Coordenada({
+      nombre,
+      lat: parseFloat(lat),
+      lon: parseFloat(lon),
+      creador: session.user.email,
+      timestamp: new Date(),
+      lugar: nombre,
+      imagen: imageUrl,
+    });
+
+    await coordenada.save();
+    return NextResponse.json(coordenada, { status: 201 });
   } catch (error) {
     console.error("Error al crear la coordenada:", error);
     return NextResponse.json(
